@@ -6,20 +6,31 @@ from decimal import Decimal
 
 from django.tasks.signals import task_started
 from django.utils.translation.trans_real import catalog
+from sqlalchemy.sql.functions import session_user
+from sqlalchemy.util import await_only
 from watchfiles import awatch
 
 BASE_URL = "https://books.toscrape.com/"
 
 class BooksParser:
-    def __init__(self, max_connections: int = 100):
-        connector = aiohttp.TCPConnector(limit=max_connections)
-        self.session = aiohttp.ClientSession(connector=connector)
+    def __init__(self, session: aiohttp.ClientSession):
+        self.session = session
 
     @classmethod
-    async def create(cls):
-        return cls()
+    async def create(cls, max_connections: int = 100):
+        connector = aiohttp.TCPConnector(limit=max_connections)
+        session = aiohttp.ClientSession(connector=connector,
+                                        headers={
+                                                "User-Agent": "Mozilla/5.0",
+                                                "Accept-Language": "ru-RU,ru;q=0.9",
+                                            },
+                                        )
+        return cls(session)
 
-    async def fetch(self, url = str) -> str:
+    async def close(self):
+        await self.session.close()
+
+    async def fetch(self, url: str) -> str:
         async with self.session.get(url) as response:
             response.raise_for_status()
             return await response.text()
@@ -27,9 +38,16 @@ class BooksParser:
     async def get_total_pages(self) -> int:
         html = await self.fetch(BASE_URL)
         soup = BeautifulSoup(html, "lxml")
-        text = soup.select_one(".pages .current").text.strip()
+        node = soup.select_one(".pages .current")
+        if not node:
+            return 1
 
-        return int(text.split("of")[-1]) # 1-50
+        text = node.text.strip()
+
+        try:
+            return int(text.split("of")[-1]) # 1-50
+        except ValueError:
+            return 1
 
     async def parse_catalog_page(self, page: int) -> List[str]:
         url = f"{BASE_URL}catalogue/page-{page}.html"
@@ -38,8 +56,8 @@ class BooksParser:
 
         links = []
         for a in soup.select("article.product_pod h3 a"):
-            href = a["href"].replace("../", "")
-            links.append(BASE_URL+href)
+            href = a["href"].replace("../../", "")
+            links.append(BASE_URL+"catalogue/"+href)
 
         return links
 
@@ -81,7 +99,5 @@ class BooksParser:
         pages_results = await asyncio.gather(*catalog_tasks)
         book_urls = [url for page in pages_results for url in page]
         book_tasks = [self.parse_book_page(url) for url in book_urls]
-        books = await asyncio.gather(*book_tasks)
 
-        await self.close()
-        return books
+        return await asyncio.gather(*book_tasks)
