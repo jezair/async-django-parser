@@ -100,4 +100,14 @@ class BooksParser:
         book_urls = [url for page in pages_results for url in page]
         book_tasks = [self.parse_book_page(url) for url in book_urls]
 
-        return await asyncio.gather(*book_tasks)
+        results = await asyncio.gather(*book_tasks, return_exceptions=True)
+        books=[]
+        for result in results:
+            if isinstance(result, Exception):
+                continue
+
+            books.append(result)
+
+        await self.close()
+        print(f"TOTAL BOOKS PARSED: {len(books)}")
+        return books

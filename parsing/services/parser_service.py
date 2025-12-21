@@ -2,12 +2,31 @@ from token import AWAIT
 
 from asgiref.sync import sync_to_async
 from sqlalchemy.orm.sync import update
+from unicodedata import category
+
+from parsing.models import Book
 
 from parsing.models import ParserRun
 import asyncio
 from django.utils import timezone
 
 from parsing.parser.books_parser import BooksParser
+
+@sync_to_async
+def _save_books(run:ParserRun, books: list[dict]):
+    objects = [
+        Book(parser_run=run,
+             title=b["title"],
+             price=b["price"],
+             rating=b["rating"],
+             availability=b["availability"],
+             category=b["category"],
+             detail_url=b["detail_url"],
+             )
+        for b in books
+    ]
+
+    Book.objects.bulk_create(objects, ignore_conflicts=True)
 
 @sync_to_async
 def _get_run(run_id:int)->ParserRun:
@@ -33,7 +52,7 @@ async def _run_books_parser_async(run_id: int):
         finally:
             await parser.close()
 
-        #TODO save a books in db
+        await _save_books(run, books)
 
         await _update_run(run, status = ParserRun.STATUS_SUCCESS, finished_at = timezone.now())
 
