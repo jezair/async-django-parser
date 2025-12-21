@@ -12,7 +12,7 @@ class Book(models.Model):
     rating = models.IntegerField()
     availability = models.BooleanField()
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="books")
-    details = models.URLField(unique=True)
+    detail_url = models.URLField(unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

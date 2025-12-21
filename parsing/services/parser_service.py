@@ -13,22 +13,6 @@ from django.utils import timezone
 from parsing.parser.books_parser import BooksParser
 
 @sync_to_async
-def _save_books(run:ParserRun, books: list[dict]):
-    objects = [
-        Book(parser_run=run,
-             title=b["title"],
-             price=b["price"],
-             rating=b["rating"],
-             availability=b["availability"],
-             category=b["category"],
-             detail_url=b["detail_url"],
-             )
-        for b in books
-    ]
-
-    Book.objects.bulk_create(objects, ignore_conflicts=True)
-
-@sync_to_async
 def _get_run(run_id:int)->ParserRun:
     return ParserRun.objects.get(id=run_id)
 
@@ -51,8 +35,6 @@ async def _run_books_parser_async(run_id: int):
             books = await parser.run()
         finally:
             await parser.close()
-
-        await _save_books(run, books)
 
         await _update_run(run, status = ParserRun.STATUS_SUCCESS, finished_at = timezone.now())
 

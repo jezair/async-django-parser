@@ -32,7 +32,7 @@ class Book(models.Model):
     rating = models.PositiveIntegerField()
     availability = models.BooleanField()
     category = models.CharField(max_length=100)
-    detail_url = models.URLField(unique=True)
+    detail_url = models.URLField(max_length=500, unique=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
