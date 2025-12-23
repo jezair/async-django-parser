@@ -39,9 +39,9 @@ class BooksParser:
             return await response.text()
 
     async def get_total_pages(self) -> int:
-        html = await self.fetch(BASE_URL)
+        html = await self.fetch(f"{BASE_URL}catalogue/page-1.html")
         soup = BeautifulSoup(html, "lxml")
-        node = soup.select_one(".pages .current")
+        node = soup.select_one(".pager .current")
         if not node:
             return 1
 
@@ -97,6 +97,7 @@ class BooksParser:
 
     async def run(self) -> List[dict]:
         total_pages = await self.get_total_pages()
+        print(f"Total pages: {total_pages}")
 
         catalog_tasks = [self.parse_catalog_page(page) for page in range(1, total_pages + 1)]
         pages_results = await asyncio.gather(*catalog_tasks)
@@ -125,5 +126,5 @@ class BooksParser:
             saved_books.append(book)
 
         await self.close()
-        print(len(saved_books))
+        print(f"Count books: {len(saved_books)}")
         return saved_books
