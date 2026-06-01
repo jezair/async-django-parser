@@ -5,13 +5,10 @@ from asgiref.sync import sync_to_async
 from bs4 import BeautifulSoup
 from decimal import Decimal
 
-from django.tasks.signals import task_started
-from django.utils.translation.trans_real import catalog
-from sqlalchemy.sql.functions import session_user
-from sqlalchemy.util import await_only
-from watchfiles import awatch
+from unicodedata import category
 
 from books.models import Category, Book
+from parsing.models import ParserRun
 
 BASE_URL = "https://books.toscrape.com/"
 
@@ -95,10 +92,62 @@ class BooksParser:
             "detail_url": url,
         }
 
-    async def run(self) -> List[dict]:
-        total_pages = await self.get_total_pages()
-        print(f"Total pages: {total_pages}")
+    async def run(self, run_id:int):
+        run = await sync_to_async(ParserRun.objects.get)(id=run_id)
 
+        try:
+            total_pages = await self.get_total_pages()
+            run.total_pages = total_pages
+            run.status = ParserRun.STATUS_RUNNING
+
+            await sync_to_async(run.save)()
+
+            for page in range(run.current_page, total_pages + 1):
+                run = await sync_to_async(ParserRun.objects.get)(id=run_id)
+
+                if run.status == ParserRun.STATUS_PAUSED:
+                    return
+
+                book_urls = await self.parse_book_page(page)
+
+                for url in book_urls:
+                    book_data = await self.parse_book_page(url)
+
+                    category, _ = await sync_to_async(Category.objects.get_or_create)(
+                        name=book_data["category"]
+                    )
+
+                    await sync_to_async(Book.objects.update_or_create)(
+                        detail_url=book_data["detail_url"],
+                        defaults=
+                        {
+                            "title": book_data["title"],
+                            "price": book_data["price"],
+                            "rating": book_data["rating"],
+                            "availability": book_data["availability"],
+                            "category": category,
+                        },
+                    )
+
+                run.current_page = page + 1
+                await sync_to_async(run.save)()
+
+            run.status = ParserRun.STATUS_FINISHED
+            await sync_to_async(run.save)()
+
+        except Exception as e:
+            run.status = ParserRun.STATUS_FAILED
+            run.error = str(e)
+            await sync_to_async(run.save)()
+
+        finally:
+            await self.close()
+
+
+
+
+
+"""
         catalog_tasks = [self.parse_catalog_page(page) for page in range(1, total_pages + 1)]
         pages_results = await asyncio.gather(*catalog_tasks)
         book_urls = [url for page in pages_results for url in page]
@@ -106,6 +155,9 @@ class BooksParser:
 
         results = await asyncio.gather(*book_tasks, return_exceptions=True)
         saved_books=[]
+
+        
+
         for result in results:
             if isinstance(result, Exception):
                 continue
@@ -127,4 +179,4 @@ class BooksParser:
 
         await self.close()
         print(f"Count books: {len(saved_books)}")
-        return saved_books
+        return saved_books"""

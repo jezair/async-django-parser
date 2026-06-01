@@ -4,7 +4,7 @@ from asgiref.sync import sync_to_async
 from sqlalchemy.orm.sync import update
 from unicodedata import category
 
-from parsing.models import Book
+from books.models import Book
 
 from parsing.models import ParserRun
 import asyncio
@@ -36,7 +36,7 @@ async def _run_books_parser_async(run_id: int):
         finally:
             await parser.close()
 
-        await _update_run(run, status = ParserRun.STATUS_SUCCESS, finished_at = timezone.now())
+        await _update_run(run, status = ParserRun.STATUS_FINISHED, finished_at = timezone.now())
 
     except Exception as e:
         await _update_run(run, status = ParserRun.STATUS_FAILED, error = str(e), finished_at = timezone.now())
