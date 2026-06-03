@@ -1,16 +1,12 @@
-from aiogram import Router
-from aiogram.filters import CommandStart
-from aiogram.types import Message
-
-from keyboards.menu import main_menu
+from aiogram import Router, types
+from keyboards.main_kb import main_keyboard
 
 router = Router()
 
-
-@router.message(CommandStart())
-async def cmd_start(message: Message):
+@router.message(lambda message: message.text == "/start")
+async def start_handler(message: types.Message):
     await message.answer(
-        "👋 Ласкаво просимо до книжкового магазину!\n\n"
-        "Оберіть потрібний пункт меню:",
-        reply_markup=main_menu,
+        "👋 Вітаю! Я бот-магазин книг.\n\n"
+        "Оберіть дію з меню нижче:",
+        reply_markup=main_keyboard
     )

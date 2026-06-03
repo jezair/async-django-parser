@@ -1,0 +1,1 @@
+user_carts: dict[int, list[int]] = {}

@@ -3,9 +3,7 @@ import httpx
 from bot_config import API_URL
 
 
-async def get_books():
+async def get_books(page: int = 1):
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"{API_URL}/books/")
-        response.raise_for_status()
-
-        return response.json()
+        r = await client.get(API_URL, params={"page": page})
+        return r.json()
